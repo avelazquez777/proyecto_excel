@@ -1,0 +1,85 @@
+{% extends 'excel_app/base.html' %}
+
+{% block title %}Error del Sistema - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    {{ error_title|default:"Error del Sistema" }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <h5><i class="bi bi-x-circle"></i> {{ error_message|default:"Ha ocurrido un error inesperado." }}</h5>
+                </div>
+                
+                {% if suggestions %}
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-lightbulb"></i> Sugerencias:</h6>
+                        <ul class="mb-0">
+                            {% for suggestion in suggestions %}
+                                <li>{{ suggestion }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                {% if show_details and exception_details %}
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-code-slash"></i>
+                                Detalles Técnicos (Modo Debug)
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <code>{{ exception_details }}</code>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div class="d-grid gap-2 mt-4">
+                    <a href="{% url 'excel_app:index' %}" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i>
+                        Volver al Inicio
+                    </a>
+                    <button onclick="history.back()" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                        Página Anterior
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información adicional -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    ¿Necesita Ayuda?
+                </h6>
+            </div>
+            <div class="card-body">
+                <p>Si el problema persiste, considere las siguientes opciones:</p>
+                <ul>
+                    <li>Intente con archivos más pequeños</li>
+                    <li>Verifique que los archivos Excel no estén corruptos</li>
+                    <li>Asegúrese de tener una conexión estable a internet</li>
+                    <li>Contacte al administrador del sistema si es necesario</li>
+                </ul>
+                
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="bi bi-clock"></i>
+                        <strong>Tiempo de procesamiento:</strong> Los archivos grandes pueden tomar varios minutos en procesarse.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,272 @@
+{% extends 'excel_app/base.html' %}
+
+{% block title %}Resultado del Procesamiento - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        
+        <!-- Alert de éxito -->
+        <div class="alert alert-success shadow">
+            <h4 class="alert-heading">
+                <i class="bi bi-check-circle-fill"></i>
+                ¡Procesamiento Completado Exitosamente!
+            </h4>
+            <p class="mb-0">
+                {% if modo_procesamiento == 'inteligente' %}
+                    Los archivos han sido comparados y procesados con modo inteligente.
+                {% else %}
+                    Los archivos han sido procesados completamente.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Información del procesamiento -->
+        {% if info_procesamiento %}
+        <div class="card shadow mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Resumen del Procesamiento
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <h6 class="text-success">
+                                <i class="bi bi-file-earmark-check"></i>
+                                Archivos Generados
+                            </h6>
+                            <h3 class="text-success">{{ info_procesamiento.archivos_generados }}</h3>
+                            <small class="text-muted">Archivos Excel individuales por obra social</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        {% if info_procesamiento.archivos_omitidos > 0 %}
+                        <div class="stats-card">
+                            <h6 class="text-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                Archivos Omitidos
+                            </h6>
+                            <h3 class="text-warning">{{ info_procesamiento.archivos_omitidos }}</h3>
+                            <small class="text-muted">Obras sociales sin datos válidos</small>
+                        </div>
+                        {% else %}
+                        <div class="stats-card">
+                            <h6 class="text-success">
+                                <i class="bi bi-check-all"></i>
+                                Sin Omisiones
+                            </h6>
+                            <p class="mb-0 text-success">Todas las obras sociales fueron procesadas correctamente</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        {% if excel_cambios_generado %}
+                        <div class="stats-card">
+                            <h6 class="text-primary">
+                                <i class="bi bi-file-earmark-diff"></i>
+                                Excel de Cambios
+                            </h6>
+                            <h3 class="text-primary">
+                                <i class="bi bi-check-circle-fill"></i>
+                            </h3>
+                            <small class="text-muted">Archivo de comparación incluido</small>
+                        </div>
+                        {% else %}
+                        <div class="stats-card">
+                            <h6 class="text-muted">
+                                <i class="bi bi-file-earmark"></i>
+                                Excel de Cambios
+                            </h6>
+                            <p class="mb-0 text-muted">
+                                {% if tiene_excel_anterior %}
+                                    No se detectaron cambios
+                                {% else %}
+                                    No aplicable (sin maestro anterior)
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <strong>Traductor Usado:</strong>
+                            {% if info_procesamiento.traductor_usado == 'personalizado' %}
+                                <span class="badge bg-primary">Personalizado</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Por Defecto</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-light">
+                            <strong>Modo de Procesamiento:</strong>
+                            {% if modo_procesamiento == 'inteligente' %}
+                                <span class="badge bg-success">Inteligente</span>
+                                <br><small>Solo obras sociales con cambios</small>
+                            {% else %}
+                                <span class="badge bg-primary">Completo</span>
+                                <br><small>Todas las obras sociales</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información adicional si hay comparación -->
+                {% if tiene_excel_anterior %}
+                <div class="alert alert-info mt-3">
+                    <h6><i class="bi bi-graph-up-arrow"></i> Procesamiento con Comparación</h6>
+                    <ul class="mb-0">
+                        <li><strong>Excel Anterior:</strong> {{ maestro_anterior_nombre }}</li>
+                        <li><strong>Excel Actual:</strong> {{ maestro_actual_nombre }}</li>
+                        {% if excel_cambios_generado %}
+                            <li><strong>Resultado:</strong> Se detectaron cambios y se generó archivo de comparación</li>
+                        {% else %}
+                            <li><strong>Resultado:</strong> No se detectaron cambios entre los maestros</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Descarga del archivo -->
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-download"></i>
+                    Descarga de Archivos
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="bi bi-file-earmark-zip" style="font-size: 4rem; color: #0d6efd;"></i>
+                </div>
+                
+                <h5>Archivo generado: <code>{{ archivo_zip }}</code></h5>
+                <p class="text-muted mb-4">
+                    Período: <strong>{{ mes }}</strong> | 
+                    Generado: <strong>{{ "now"|date:"d/m/Y H:i" }}</strong>
+                </p>
+                
+                <div class="d-grid gap-2 col-md-6 mx-auto">
+                    <a href="{% url 'excel_app:descargar_archivo' archivo_zip %}" 
+                       class="btn btn-primary btn-lg" 
+                       download>
+                        <i class="bi bi-download"></i>
+                        Descargar ZIP ({{ archivo_zip }})
+                    </a>
+                    
+                    <a href="{% url 'excel_app:index' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i>
+                        Procesar Nuevos Archivos
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información adicional -->
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">
+                    <i class="bi bi-lightbulb"></i>
+                    Contenido del Archivo ZIP
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Archivos incluidos:</h6>
+                        <ul>
+                            {% if excel_cambios_generado %}
+                            <li><i class="bi bi-file-earmark-diff text-primary"></i> <strong>cambios_global_{{ mes }}.xlsx</strong> - Comparación de cambios</li>
+                            {% endif %}
+                            <li><i class="bi bi-file-earmark-spreadsheet text-success"></i> <strong>{{ info_procesamiento.archivos_generados }} archivos individuales</strong> - Uno por obra social procesada</li>
+                            <li>Formato compatible con el sistema de facturación</li>
+                        </ul>
+                        
+                        {% if excel_cambios_generado %}
+                        <div class="alert alert-primary small">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Excel de Cambios:</strong> Contiene todos los cambios detectados entre el maestro anterior y actual, organizados por estado (Nuevo, Modificado, Eliminado).
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Formato de archivos generados:</h6>
+                        <ul>
+                            <li><strong>Nombre:</strong> [OBRA_SOCIAL]_{{ mes }}.xlsx</li>
+                            <li><strong>Columnas:</strong> 10 columnas según especificación</li>
+                            <li><strong>Orden:</strong> Por importe descendente</li>
+                            <li><strong>Duplicados:</strong> Eliminados automáticamente</li>
+                        </ul>
+                        
+                        {% if modo_procesamiento == 'inteligente' %}
+                        <div class="alert alert-success small">
+                            <i class="bi bi-lightning"></i>
+                            <strong>Procesamiento Inteligente:</strong> Solo se procesaron las obras sociales que tuvieron cambios respecto al maestro anterior.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="bi bi-clock"></i>
+                    <strong>Importante:</strong> 
+                    Los archivos se eliminan automáticamente después de 7 días. 
+                    Descarga y guarda una copia en tu sistema.
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen técnico (solo si hay información detallada) -->
+        {% if debug and info_procesamiento %}
+        <div class="card mt-4">
+            <div class="card-header bg-dark text-white">
+                <h6 class="mb-0">
+                    <i class="bi bi-bug"></i>
+                    Información Técnica de Debug
+                </h6>
+            </div>
+            <div class="card-body">
+                <pre><code>{{ info_procesamiento|pprint }}</code></pre>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-focus en el botón de descarga para accesibilidad
+    const downloadBtn = document.querySelector('a[download]');
+    if (downloadBtn) {
+        downloadBtn.focus();
+    }
+    
+    // Log información del procesamiento
+    {% if info_procesamiento.archivos_generados > 0 %}
+        console.log('Procesamiento exitoso:', {
+            archivos_generados: {{ info_procesamiento.archivos_generados }},
+            modo: '{{ modo_procesamiento }}',
+            cambios_detectados: {{ excel_cambios_generado|yesno:"true,false" }},
+            traductor: '{{ info_procesamiento.traductor_usado }}'
+        });
+    {% endif %}
+    
+    // Mostrar información adicional sobre el contenido del ZIP
+    {% if excel_cambios_generado %}
+        console.log('Excel de cambios incluido en el ZIP');
+    {% endif %}
+});
+</script>
+{% endblock %}

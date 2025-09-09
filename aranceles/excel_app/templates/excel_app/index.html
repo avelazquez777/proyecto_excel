@@ -1,0 +1,161 @@
+{% extends 'excel_app/base.html' %}
+
+{% block title %}Subir Archivos - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+
+        <!-- Alert para errores del sistema -->
+        <div id="systemAlert" class="alert alert-warning d-none" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Advertencia del Sistema:</strong> <span id="systemAlertMessage"></span>
+        </div>
+
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-upload"></i>
+                    Procesamiento de Aranceles
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="file-info">
+                    <h6><i class="bi bi-info-circle"></i> Instrucciones:</h6>
+                    <ul class="mb-2">
+                        <li><strong>Excel Maestro Actual:</strong> Archivo obligatorio con los datos actuales</li>
+                        <li><strong>Excel Maestro Anterior:</strong> Opcional, para comparar cambios</li>
+                        <li><strong>Traductor:</strong> Opcional, si no se sube se usa el predeterminado</li>
+                        <li><strong>Mes:</strong> Formato YYYY-MM (ej: 2025-09)</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-shield-check"></i> 
+                        <strong>Límites:</strong> Archivos maestro max 10MB, traductor max 5MB. Solo formatos .xlsx y .xls.
+                    </div>
+                </div>
+
+                <form method="post" enctype="multipart/form-data" 
+                      action="{% url 'excel_app:procesar_excel' %}" id="uploadForm" novalidate>
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label for="{{ form.excel_maestro_actual.id_for_label }}" class="form-label fw-bold text-danger">
+                            {{ form.excel_maestro_actual.label }} *
+                        </label>
+                        {{ form.excel_maestro_actual }}
+                        <div class="form-text">{{ form.excel_maestro_actual.help_text }}</div>
+                        <div class="invalid-feedback" id="error-excel_maestro_actual">
+                            {% for error in form.excel_maestro_actual.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.excel_maestro_anterior.id_for_label }}" class="form-label fw-bold">
+                            {{ form.excel_maestro_anterior.label }}
+                        </label>
+                        {{ form.excel_maestro_anterior }}
+                        <div class="form-text">{{ form.excel_maestro_anterior.help_text }}</div>
+                        <div class="invalid-feedback" id="error-excel_maestro_anterior">
+                            {% for error in form.excel_maestro_anterior.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.traductor_personalizado.id_for_label }}" class="form-label fw-bold">
+                            {{ form.traductor_personalizado.label }}
+                        </label>
+                        {{ form.traductor_personalizado }}
+                        <div class="form-text">{{ form.traductor_personalizado.help_text }}</div>
+                        <div class="invalid-feedback" id="error-traductor_personalizado">
+                            {% for error in form.traductor_personalizado.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.mes.id_for_label }}" class="form-label fw-bold text-danger">
+                            {{ form.mes.label }} *
+                        </label>
+                        {{ form.mes }}
+                        <div class="form-text">{{ form.mes.help_text }}</div>
+                        <div class="invalid-feedback" id="error-mes">
+                            {% for error in form.mes.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="bi bi-gear-fill"></i>
+                            Procesar Archivos
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="cancelBtn" style="display: none;">
+                            <i class="bi bi-x-circle"></i>
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                    <i class="bi bi-question-circle"></i>
+                    ¿Cómo funciona?
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Sin Excel Anterior:</h6>
+                        <ul>
+                            <li>Se procesan todas las obras sociales</li>
+                            <li>Se generan Excel individuales para cada una</li>
+                            <li>Todo se empaqueta en un ZIP</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Con Excel Anterior:</h6>
+                        <ul>
+                            <li>Se comparan los dos maestros</li>
+                            <li>Se genera un Excel de cambios globales</li>
+                            <li>Solo se procesan obras sociales con cambios</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Tiempo estimado:</strong> El procesamiento puede tomar entre 1-10 minutos dependiendo del tamaño de los archivos.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Desactivar botón para prevenir doble submit
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Procesando...';
+        });
+    }
+});
+</script>
+{% endblock %}
