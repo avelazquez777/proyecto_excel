@@ -1,34 +1,26 @@
-venv
-env
-.env
-__pycache__/
-*.pyc
-.venv
-.idea/
-.DS_Store
-sqlite.db
-migrations/
-instance/
+# Django
 *.log
-*.sqlite3
 *.pot
-*.mo
 *.pyc
-*.pyo
-*.pyd
-*.swp
-*.swo
-*.bak
-*.tmp
-*.orig
-*.rej
-*.cover
-.coverage
-htmlcov/
-.tox/
-.nox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+__pycache__/
+local_settings.py
+db.sqlite3
+media/uploads/*
+media/outputs/*
+
+# Keep important files
+!media/uploads/.gitkeep
+!media/outputs/.gitkeep
+
+# Environment
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
