@@ -11,7 +11,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-this')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
+# CORREGIDO: Detectar DEBUG de forma más robusta
+DEBUG_ENV = os.environ.get('DJANGO_DEBUG', 'False')
+DEBUG = DEBUG_ENV.lower() in ('true', '1', 'yes', 'on')
+
+# Para desarrollo local, forzar DEBUG=True si no está configurado
+if not os.environ.get('DJANGO_DEBUG') and SECRET_KEY == 'dev-secret-key-change-this':
+    DEBUG = True
+    
+print(f"DEBUG MODE: {DEBUG}")  # Para verificar
 
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 if not DEBUG:
@@ -55,6 +63,7 @@ else:
 # APLICACIONES MÍNIMAS
 # ================================
 INSTALLED_APPS = [
+    'django.contrib.admin',
     'django.contrib.contenttypes',  # Necesario para admin
     'django.contrib.auth',          # Necesario para admin
     'django.contrib.sessions',      # Necesario para formularios
@@ -62,10 +71,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',   # Para archivos estáticos
     'excel_app',
 ]
-
-# Remover admin si no es necesario en producción
-if DEBUG:
-    INSTALLED_APPS.insert(0, 'django.contrib.admin')
 
 # ================================
 # MIDDLEWARE MÍNIMO
@@ -76,25 +81,30 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Solo si tienes admin
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
-    # Tus middlewares personalizados (orden importa)
-    'excel_app.middleware.FileUploadSecurityMiddleware',
-    'excel_app.middleware.RequestLoggingMiddleware', 
-    'excel_app.middleware.ResponseTimeMiddleware',
-    'excel_app.middleware.FileCleanupMiddleware',
-    'excel_app.middleware.ExcelProcessingMiddleware',  # DEBE IR AL FINAL
 ]
 
-# Solo agregar auth middleware si admin está habilitado
-if 'django.contrib.admin' in INSTALLED_APPS:
-    MIDDLEWARE.insert(-1, 'django.contrib.auth.middleware.AuthenticationMiddleware')
+# Solo agregar middlewares personalizados si la app excel_app existe
+try:
+    import excel_app.middleware
+    MIDDLEWARE.extend([
+        'excel_app.middleware.FileUploadSecurityMiddleware',
+        'excel_app.middleware.RequestLoggingMiddleware', 
+        'excel_app.middleware.ResponseTimeMiddleware',
+        'excel_app.middleware.FileCleanupMiddleware',
+        'excel_app.middleware.ExcelProcessingMiddleware',  # DEBE IR AL FINAL
+    ])
+except ImportError:
+    pass
 
 # Solo agregar cleanup middleware en producción
 if not DEBUG:
-    MIDDLEWARE.append('excel_app.middleware.FileCleanupMiddleware')
+    try:
+        MIDDLEWARE.append('excel_app.middleware.FileCleanupMiddleware')
+    except:
+        pass
 
 ROOT_URLCONF = 'aranceles.urls'
 
@@ -110,7 +120,8 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.messages.context_processors.messages',
-            ] + (['django.contrib.auth.context_processors.auth'] if 'django.contrib.admin' in INSTALLED_APPS else []),
+                'django.contrib.auth.context_processors.auth',
+            ],
         },
     },
 ]
@@ -143,7 +154,12 @@ USE_TZ = True
 # ================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Solo usar WhiteNoise en producción
+if DEBUG:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files con límites
 MEDIA_URL = '/media/'
@@ -155,7 +171,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 if not DEBUG and not USE_FILE_LOGGING:
     LOGGING = {
         'version': 1,
-        'disable_existing_loggers': True,  # CAMBIAR a True para ahorrar memoria
+        'disable_existing_loggers': True,
         'formatters': {
             'simple': {
                 'format': '{levelname} {message}',
@@ -171,17 +187,17 @@ if not DEBUG and not USE_FILE_LOGGING:
         },
         'root': {
             'handlers': ['console'],
-            'level': 'ERROR',  # SOLO errores en producción
+            'level': 'ERROR',
         },
         'loggers': {
             'django': {
                 'handlers': ['console'],
-                'level': 'ERROR',  # SOLO errores
+                'level': 'ERROR',
                 'propagate': False,
             },
             'excel_app': {
                 'handlers': ['console'],
-                'level': 'ERROR',  # SOLO errores
+                'level': 'ERROR',
                 'propagate': False,
             },
         },
@@ -206,11 +222,28 @@ else:
 # CONFIGURACIÓN DE SEGURIDAD
 # ================================
 if not DEBUG:
+    # Solo para producción
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
+else:
+    # Para desarrollo - DESHABILITAR COMPLETAMENTE SSL
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+    SECURE_BROWSER_XSS_FILTER = False
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    X_FRAME_OPTIONS = 'SAMEORIGIN'
+    
+    # Variables adicionales para asegurar HTTP
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    
+    # CRÍTICO: Deshabilitar redirecciones HTTPS
+    USE_TLS = False
+    SECURE_REDIRECT_EXEMPT = []
 
 # ================================
 # CONFIGURACIÓN EXCEL ULTRA OPTIMIZADA
@@ -247,3 +280,22 @@ CACHES = {
         }
     }
 }
+
+# ================================
+# CONFIGURACIÓN ESPECÍFICA PARA DESARROLLO LOCAL
+# ================================
+if DEBUG:
+    # Asegurar que no hay redirecciones SSL en desarrollo
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+    
+    # Configuraciones adicionales para desarrollo
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '0.0.0.0'])
+    
+    # Deshabilitar WhiteNoise en desarrollo
+    if 'whitenoise.middleware.WhiteNoiseMiddleware' in MIDDLEWARE:
+        MIDDLEWARE.remove('whitenoise.middleware.WhiteNoiseMiddleware')
+
+# Print de verificación
+print(f"SECURE_SSL_REDIRECT: {globals().get('SECURE_SSL_REDIRECT', 'Not set')}")
+print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
