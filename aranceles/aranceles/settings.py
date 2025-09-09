@@ -2,19 +2,18 @@ from pathlib import Path
 import os
 import logging
 import sys
+import dj_database_url
 
-# ----------------------------
-# Paths base
-# ----------------------------
+# Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ----------------------------
-# Seguridad
-# ----------------------------
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')  # En producción, definir variable de entorno
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-this')
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
+
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 # ----------------------------
 # Aplicaciones
 # ----------------------------
@@ -33,6 +32,7 @@ INSTALLED_APPS = [
 # ----------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -97,12 +97,13 @@ USE_TZ = True
 # Archivos estáticos
 # ----------------------------
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para collectstatic en producción
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 
-# ----------------------------
-# Archivos subidos
-# ----------------------------
+# WhiteNoise configuration
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

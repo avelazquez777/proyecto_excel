@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: aranceles-app
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "python manage.py runserver 0.0.0.0:$PORT"
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "*.onrender.com"
+      - key: WEB_CONCURRENCY
+        value: "4"
