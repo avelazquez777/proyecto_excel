@@ -14,7 +14,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=7,
+            default=2,
             help='Días de antigüedad para eliminar archivos (por defecto: 7)'
         )
         parser.add_argument(

@@ -238,3 +238,40 @@ MIDDLEWARE = [
     'excel_app.middleware.ExcelProcessingMiddleware',  # Este debe ir al final
 ]
 """
+
+def cleanup_old_files():
+    """Limpia archivos ZIP de más de 24 horas"""
+    from django.conf import settings
+    from pathlib import Path
+    import time
+    
+    output_dir = Path(settings.MEDIA_ROOT) / "outputs"
+    if not output_dir.exists():
+        return
+    
+    now = time.time()
+    one_day = 24 * 60 * 60
+    
+    for zip_file in output_dir.glob("*.zip"):
+        try:
+            if now - zip_file.stat().st_mtime > one_day:
+                zip_file.unlink()
+                logger.info(f"Archivo antiguo eliminado: {zip_file.name}")
+        except Exception as e:
+            logger.warning(f"Error eliminando archivo antiguo: {e}")
+
+class FileCleanupMiddleware:
+    """Middleware que limpia archivos antiguos ocasionalmente"""
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.last_cleanup = 0
+    
+    def __call__(self, request):
+        # Limpiar cada 4 horas aproximadamente (14400 segundos)
+        import time
+        now = time.time()
+        if now - self.last_cleanup > 14400:  # 4 horas
+            cleanup_old_files()
+            self.last_cleanup = now
+        
+        return self.get_response(request)
