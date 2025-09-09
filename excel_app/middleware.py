@@ -1,11 +1,15 @@
 # excel_app/middleware.py
 import logging
 import traceback
+import gc
+import os
+import tempfile
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.contrib import messages
 from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
+from pathlib import Path
 import time
 
 logger = logging.getLogger(__name__)
@@ -19,6 +23,12 @@ class ExcelProcessingMiddleware:
     def __call__(self, request):
         start_time = time.time()
         
+        # === NUEVA: Optimización de memoria antes del request ===
+        if getattr(settings, 'FORCE_GC_EVERY_REQUEST', False):
+            collected = gc.collect()
+            if collected > 0:
+                logger.debug(f"GC collected {collected} objects before request")
+        
         try:
             response = self.get_response(request)
             
@@ -27,10 +37,56 @@ class ExcelProcessingMiddleware:
             if processing_time > 5:  # Más de 5 segundos
                 logger.info(f"Request lento: {request.path} - {processing_time:.2f}s")
             
+            # === NUEVA: Limpieza de memoria después del request ===
+            self._cleanup_memory_after_request()
+            
             return response
             
         except Exception as e:
+            # === NUEVA: Limpieza de memoria en caso de error ===
+            self._cleanup_memory_after_request()
             return self.handle_exception(request, e)
+
+    def _cleanup_memory_after_request(self):
+        """Limpia memoria después de cada request"""
+        try:
+            # Limpiar archivos temporales
+            self._cleanup_temp_files()
+            
+            # Forzar garbage collection si está habilitado
+            if getattr(settings, 'FORCE_GC_EVERY_REQUEST', False):
+                collected = gc.collect()
+                if collected > 0:
+                    logger.debug(f"GC collected {collected} objects after request")
+        except Exception as e:
+            logger.warning(f"Error en limpieza de memoria: {e}")
+
+    def _cleanup_temp_files(self):
+        """Limpia archivos temporales agresivamente"""
+        try:
+            # Limpiar directorio de uploads
+            upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
+            if upload_dir.exists():
+                cutoff_time = time.time() - 600  # 10 minutos
+                for file_path in upload_dir.glob('*'):
+                    try:
+                        if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
+                            file_path.unlink()
+                    except Exception:
+                        pass  # Ignorar errores de limpieza
+            
+            # Limpiar directorio temporal del sistema
+            temp_dir = Path(tempfile.gettempdir())
+            cutoff_time = time.time() - 300  # 5 minutos
+            for temp_file in temp_dir.glob('tmp*'):
+                try:
+                    if temp_file.is_file() and temp_file.stat().st_mtime < cutoff_time:
+                        temp_file.unlink()
+                except Exception:
+                    pass
+                    
+        except Exception as e:
+            logger.warning(f"Error en limpieza de archivos temporales: {e}")
 
     def handle_exception(self, request, exception):
         """Maneja excepciones no controladas"""
@@ -137,10 +193,10 @@ class FileUploadSecurityMiddleware:
             if not uploaded_file.name.lower().endswith(('.xlsx', '.xls')):
                 raise SuspiciousOperation(f"Extensión no permitida: {uploaded_file.name}")
             
-            # Verificar tamaño máximo general
-            max_size = 15 * 1024 * 1024  # 15MB límite absoluto
+            # === MODIFICADO: Tamaño reducido para Render gratuito ===
+            max_size = 5 * 1024 * 1024  # REDUCIDO a 5MB (era 15MB)
             if uploaded_file.size > max_size:
-                raise SuspiciousOperation(f"Archivo demasiado grande: {uploaded_file.name}")
+                raise SuspiciousOperation(f"Archivo demasiado grande: {uploaded_file.name} (máximo 5MB)")
             
             # Verificar nombre de archivo por caracteres sospechosos
             suspicious_chars = ['..', '/', '\\', '<', '>', ':', '"', '|', '?', '*']
@@ -220,25 +276,6 @@ class ResponseTimeMiddleware:
         return response
 
 
-# Configuración para agregar a settings.py:
-"""
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
-    # Middlewares personalizados (agregar al final)
-    'excel_app.middleware.FileUploadSecurityMiddleware',
-    'excel_app.middleware.RequestLoggingMiddleware', 
-    'excel_app.middleware.ResponseTimeMiddleware',
-    'excel_app.middleware.ExcelProcessingMiddleware',  # Este debe ir al final
-]
-"""
-
 def cleanup_old_files():
     """Limpia archivos ZIP de más de 24 horas"""
     from django.conf import settings
@@ -250,28 +287,32 @@ def cleanup_old_files():
         return
     
     now = time.time()
-    one_day = 24 * 60 * 60
+    # === MODIFICADO: Limpiar archivos más frecuentemente en Render ===
+    cleanup_time = 2 * 60 * 60  # 2 horas (era 24 horas)
     
     for zip_file in output_dir.glob("*.zip"):
         try:
-            if now - zip_file.stat().st_mtime > one_day:
+            if now - zip_file.stat().st_mtime > cleanup_time:
                 zip_file.unlink()
                 logger.info(f"Archivo antiguo eliminado: {zip_file.name}")
         except Exception as e:
             logger.warning(f"Error eliminando archivo antiguo: {e}")
 
+
 class FileCleanupMiddleware:
-    """Middleware que limpia archivos antiguos ocasionalmente"""
+    """Middleware que limpia archivos antiguos ocasionalmente - OPTIMIZADO"""
     def __init__(self, get_response):
         self.get_response = get_response
         self.last_cleanup = 0
     
     def __call__(self, request):
-        # Limpiar cada 4 horas aproximadamente (14400 segundos)
+        # === MODIFICADO: Limpiar más frecuentemente para Render ===
         import time
         now = time.time()
-        if now - self.last_cleanup > 14400:  # 4 horas
+        if now - self.last_cleanup > 1800:  # 30 minutos (era 4 horas)
             cleanup_old_files()
             self.last_cleanup = now
+            # Forzar garbage collection después de limpieza
+            gc.collect()
         
         return self.get_response(request)

@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: aranceles-excel-app
+    name: excel-os-app
     env: python
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn aranceles.wsgi:application --bind 0.0.0.0:$PORT"
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "gunicorn --config gunicorn.conf.py aranceles.wsgi:application"
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
@@ -13,3 +13,23 @@ services:
         value: "*.onrender.com"
       - key: PYTHON_VERSION
         value: "3.12.3"
+      - key: PORT
+        value: "10000"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+      # ===== VARIABLES CRÍTICAS PARA MEMORIA =====
+      - key: MALLOC_TRIM_THRESHOLD_
+        value: "100000"
+      - key: MALLOC_MMAP_THRESHOLD_
+        value: "100000"
+      - key: PYTHONHASHSEED
+        value: "0"
+      - key: DJANGO_SETTINGS_MODULE
+        value: "aranceles.settings"
+    healthCheckPath: "/"
+    # ===== CONFIGURACIONES CRÍTICAS PARA RENDER GRATUITO =====
+    plan: starter  # Especificar plan gratuito explícitamente
+    region: oregon  # Oregon suele tener mejor rendimiento
+    maxUptimeMinutes: 60  # Reiniciar cada hora para evitar memory leaks
